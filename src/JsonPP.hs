@@ -2,6 +2,7 @@
 
 import Control.Monad (fmap)
 import System.IO (stdin, stdout)
+import Data.List (sortBy)
     
 import Data.Aeson
 import Data.Aeson.Encode (encode)
@@ -24,14 +25,31 @@ main = do
     
 ppJson :: Value -> Doc
 ppJson (Object o) = group $ text "{" <> nest 2 (linebreak <> ppObject o) <> linebreak <> text "}"
-ppJson (Array a) = group $ text "[" <> nest 2 (linebreak <> ppArr a) <> linebreak <> text "]"
+ppJson (Array a) = case (lastIsObject, firstIsObject) of
+       (True, True) -> group $ text "[" <> nest 2 (ppArr a <> text "]")
+       (True, False) -> group $ text "[" <> nest 2 (linebreak <> ppArr a <> text "]")
+       (False, True) -> group $ text "[" <> nest 2 (ppArr a) <> linebreak <> text "]"
+       (False, False) -> group $ text "[" <> nest 2 (linebreak <> ppArr a) <> linebreak <> text "]"
+  where
+    lastIsObject = isObject (reverse elems)
+    firstIsObject = isObject elems
+    elems = elements a                                
+    isObject elements = case elements of
+                     Object _ : _ -> True
+                     _ -> False
 ppJson v = text . decodeUtf8 . encode $ v
 
 ppArr :: Array -> Doc
-ppArr = ppCommaSep . map ppJson . V.toList
+ppArr = ppCommaSep . map ppJson . elements
 
 ppObject :: Object -> Doc
-ppObject = ppCommaSep . map ppProperty . H.toList
+ppObject = ppCommaSep . map ppProperty . sortBy (\(l, _) (r, _) -> compare l r) . properties
+
+elements :: Array -> [Value]
+elements = V.toList
+           
+properties :: Object -> [(Strict.Text, Value)]
+properties = H.toList
 
 ppProperty :: (Strict.Text, Value) -> Doc
 ppProperty (name, value) =

@@ -1,0 +1,8 @@
+A simple executable for reformatting JSON documents. Reads from
+standard in and writes to standard out. Takes no parameters.
+
+To build:
+
+  cabal sandbox init
+  cabal install
+  .cabal-and
