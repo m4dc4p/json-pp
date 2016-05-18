@@ -15,21 +15,25 @@ import Text.PrettyPrint.Leijen.Text
 import qualified Data.ByteString.Lazy as B
 import qualified Data.HashMap.Strict as H (toList)
 import qualified Data.Vector as V
-    
+
 main = do
   input <- B.getContents
   let result = fmap ppJson (decode input :: Maybe Value)
-  TIO.putStrLn $ case result of
-    Just doc -> displayT (renderPretty 0.9 100 doc)
-    _ -> "Error"
-    
+  case result of
+    Just doc -> do
+      TIO.putStrLn (displayT (renderPretty 0.9 100 doc))
+      exit 0
+    _ -> do
+      putStrLn "Error decoding JSON."
+      exit 1
+
 ppJson :: Value -> Doc
 ppJson (Object o) = group $ text "{" <> nest 2 (linebreak <> ppObject o) <> linebreak <> text "}"
 ppJson (Array a) = case (lastIsObject, firstIsObject) of
        (True, True) -> group $ text "[" <> nest 2 (ppArr a <> text "]")
-       (True, False) -> group $ text "[" <> nest 2 (linebreak <> ppArr a <> text "]")
-       (False, True) -> group $ text "[" <> nest 2 (ppArr a) <> linebreak <> text "]"
-       (False, False) -> group $ text "[" <> nest 2 (linebreak <> ppArr a) <> linebreak <> text "]"
+       (True, _) -> group $ text "[" <> nest 2 (linebreak <> ppArr a <> text "]")
+       (_, True) -> group $ text "[" <> nest 2 (ppArr a) <> linebreak <> text "]"
+       _ -> group $ text "[" <> nest 2 (linebreak <> ppArr a) <> linebreak <> text "]"
   where
     lastIsObject = isObject (reverse elems)
     firstIsObject = isObject elems
@@ -39,12 +43,23 @@ ppJson (Array a) = case (lastIsObject, firstIsObject) of
                      _ -> False
 ppJson v = text . decodeUtf8 . encode $ v
 
+
+ppAlt :: (Value -> Boolean) -> (Value -> Doc) -> (Value -> Doc) -> Value -> Doc
+ppAlt cond t f v = if cond v
+                   then t v
+                   else f v
+                 
+
+
 ppArr :: Array -> Doc
 ppArr = ppCommaSep . map ppJson . elements
 
 ppObject :: Object -> Doc
-ppObject = ppCommaSep . map ppProperty . sortBy (\(l, _) (r, _) -> compare l r) . properties
+ppObject = ppCommaSep . map ppProperty . sortByKeys . properties
 
+sortByKeys :: [(Strict.Text, Value)] -> [(Strct.Text, Value)]
+sortByKeys = sortBy (\(l, _) (r, _) -> compare l r)
+           
 elements :: Array -> [Value]
 elements = V.toList
            
